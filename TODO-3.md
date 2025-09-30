@@ -67,11 +67,11 @@ import (
 
 type UserStore interface {
 	CreateUser(ctx context.Context, u *model.User) error
-	GetUserByID(ctx context.Context, id string) (*model.User, error)
+	GetUserByID(ctx context.Context, uuid string) (*model.User, error)
 	GetUserByEmail(ctx context.Context, email string) (*model.User, error)
 	ListUsers(ctx context.Context, limit, offset int) ([]*model.User, error)
 	UpdateUser(ctx context.Context, u *model.User) error
-	DeleteUser(ctx context.Context, id string) error
+	DeleteUser(ctx context.Context, uuid string) error
 	Close() error
 }
 ```
@@ -91,11 +91,15 @@ import (
 	"sync"
 
 	"github.com/google/uuid"
-	"tp-echo/db"
+
+    "tp-echo/db"
 	"tp-echo/model"
 )
 
 var _ db.UserStore = (*MockUserStore)(nil)
+
+// ou
+// var _ db.UserStore = &MockUserStore{}
 
 type MockUserStore struct {
 	mu    sync.RWMutex
@@ -114,15 +118,15 @@ func (m *MockUserStore) CreateUser(ctx context.Context, u *model.User) error {
 			return errors.New("email already exists")
 		}
 	}
-    u.ID = uuid.NewString()
-	m.users[u.ID] = u
+	u.UUID = uuid.NewString()
+	m.users[u.UUID] = u
 	return nil
 }
 
-func (m *MockUserStore) GetUserByID(ctx context.Context, id string) (*model.User, error) {
+func (m *MockUserStore) GetUserByID(ctx context.Context, uuid string) (*model.User, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	u, ok := m.users[id]
+	u, ok := m.users[uuid]
 	if !ok {
 		return nil, errors.New("not found")
 	}
@@ -154,24 +158,25 @@ func (m *MockUserStore) ListUsers(ctx context.Context, limit, offset int) ([]*mo
 func (m *MockUserStore) UpdateUser(ctx context.Context, u *model.User) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if _, ok := m.users[u.ID]; !ok {
+	if _, ok := m.users[u.UUID]; !ok {
 		return errors.New("not found")
 	}
-	m.users[u.ID] = u
+	m.users[u.UUID] = u
 	return nil
 }
 
-func (m *MockUserStore) DeleteUser(ctx context.Context, id string) error {
+func (m *MockUserStore) DeleteUser(ctx context.Context, uuid string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if _, ok := m.users[id]; !ok {
+	if _, ok := m.users[uuid]; !ok {
 		return errors.New("not found")
 	}
-	delete(m.users, id)
+	delete(m.users, uuid)
 	return nil
 }
 
 func (m *MockUserStore) Close() error { return nil }
+
 ```
 
 ---
@@ -190,11 +195,14 @@ import (
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 
-	"tp-echo/db"
-	"tp-echo/model"
+	"formation/db"
+	"formation/model"
 )
 
 var _ db.UserStore = (*LocalUserStore)(nil)
+
+// ou
+// var _ db.UserStore = &LocalUserStore{}
 
 type LocalUserStore struct {
 	db *gorm.DB
@@ -215,9 +223,9 @@ func (s *LocalUserStore) CreateUser(ctx context.Context, u *model.User) error {
 	return s.db.WithContext(ctx).Create(u).Error
 }
 
-func (s *LocalUserStore) GetUserByID(ctx context.Context, id string) (*model.User, error) {
+func (s *LocalUserStore) GetUserByID(ctx context.Context, UUID string) (*model.User, error) {
 	var out model.User
-	if err := s.db.WithContext(ctx).First(&out, "id = ?", id).Error; err != nil {
+	if err := s.db.WithContext(ctx).First(&out, "uuid = ?", UUID).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errors.New("not found")
 		}
@@ -256,8 +264,8 @@ func (s *LocalUserStore) UpdateUser(ctx context.Context, u *model.User) error {
 	return s.db.WithContext(ctx).Save(u).Error
 }
 
-func (s *LocalUserStore) DeleteUser(ctx context.Context, id string) error {
-	return s.db.WithContext(ctx).Delete(&model.User{ID: id}).Error
+func (s *LocalUserStore) DeleteUser(ctx context.Context, UUID string) error {
+	return s.db.WithContext(ctx).Delete(&model.User{UUID: UUID}).Error
 }
 
 func (s *LocalUserStore) Close() error {
