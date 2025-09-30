@@ -105,13 +105,13 @@ admin.GET("/dash", func(c echo.Context) error { return c.String(200, "ok") })
 **Objectif :** décoder un corps JSON proprement.
 
 ```go
-type UserDTO struct {
+type User struct {
   Name  string `json:"name"`
   Email string `json:"email"`
 }
 
 e.POST("/users", func(c echo.Context) error {
-  var u UserDTO
+  var u User
   if err := c.Bind(&u); err != nil {
     return c.String(400, "bad request")
   }
@@ -185,7 +185,7 @@ e.HTTPErrorHandler = func(err error, c echo.Context) {
 1. Préparer le dossier :
 
 ```go
-os.MkdirAll("uploads", 0o755)
+os.MkdirAll("uploads", 0750)
 ```
 
 2. (Optionnel) Limiter la taille :
@@ -232,7 +232,7 @@ curl -F 'file=@README.md' :1323/upload
 
 ## 11) Générer un JWT (token de session) + route protégée
 
-**Objectif :** créer un endpoint `/login` qui renvoie un JWT puis protéger `/api/me`.
+**Objectif :** créer un endpoint `/login` qui renvoie un JWT puis protéger `/api/users`.
 
 1. Dépendance :
 
@@ -295,7 +295,7 @@ api.Use(middleware.JWTWithConfig(middleware.JWTConfig{
   Claims:     &JwtCustomClaims{},
 }))
 
-api.GET("/me", func(c echo.Context) error {
+api.GET("/users", func(c echo.Context) error {
   userToken := c.Get("user").(*jwt.Token)
   claims := userToken.Claims.(*JwtCustomClaims)
   return c.JSON(200, map[string]any{
@@ -315,10 +315,7 @@ TOKEN=$(curl -s -X POST :1323/login \
   -d '{"email":"joe@ex","name":"Joe"}' | jq -r .token)
 
 # 2) Appeler la route protégée
-curl -H "Authorization: Bearer $TOKEN" :1323/api/me
+curl -H "Authorization: Bearer $TOKEN" :1323/api/users
 ```
-
-> Imports :
-> `github.com/golang-jwt/jwt/v5`, `github.com/labstack/echo/v4/middleware`, `time`.
 
 🎯 **Fin du TP**
