@@ -9,7 +9,16 @@ Objectifs :
 
 ---
 
-## 0) Pré-requis & initialisation
+## Références utiles
+
+- [Documentation GORM](https://gorm.io/docs/)
+- [Driver SQLite](https://gorm.io/docs/connecting_to_the_database.html#SQLite)
+- [Hooks](https://gorm.io/docs/hooks.html)
+- [Scopes & requêtes avancées](https://gorm.io/docs/scopes.html)
+
+---
+
+## Pré-requis & initialisation
 
 ```bash
 mkdir -p tp-echo/{model,db/{mock,local}}
@@ -30,9 +39,11 @@ package model
 import "time"
 
 type User struct {
-	ID        string    `gorm:"primaryKey;size:36" json:"id"`
-	Email     string    `gorm:"uniqueIndex;size:255;not null" json:"email"`
-	Name      string    `gorm:"size:255;not null" json:"name"`
+	UUID      string    `json:"uuid" gorm:"primaryKey"`
+	FristName string    `json:"first_name"`
+	LastName  string    `json:"last_name"`
+	Email     string    `json:"email" gorm:"uniqueIndex"`
+    Password  string    `json:"password"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 	// Soft delete possible si besoin :
@@ -98,16 +109,13 @@ func New() *MockUserStore {
 func (m *MockUserStore) CreateUser(ctx context.Context, u *model.User) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if u.ID == "" {
-		u.ID = uuid.NewString()
-	}
 	for _, existing := range m.users {
 		if existing.Email == u.Email {
 			return errors.New("email already exists")
 		}
 	}
-	cp := *u
-	m.users[u.ID] = &cp
+    u.ID = uuid.NewString()
+	m.users[u.ID] = u
 	return nil
 }
 
@@ -118,8 +126,7 @@ func (m *MockUserStore) GetUserByID(ctx context.Context, id string) (*model.User
 	if !ok {
 		return nil, errors.New("not found")
 	}
-	cp := *u
-	return &cp, nil
+	return u, nil
 }
 
 func (m *MockUserStore) GetUserByEmail(ctx context.Context, email string) (*model.User, error) {
@@ -127,8 +134,7 @@ func (m *MockUserStore) GetUserByEmail(ctx context.Context, email string) (*mode
 	defer m.mu.RUnlock()
 	for _, u := range m.users {
 		if u.Email == email {
-			cp := *u
-			return &cp, nil
+			return u, nil
 		}
 	}
 	return nil, errors.New("not found")
@@ -139,17 +145,10 @@ func (m *MockUserStore) ListUsers(ctx context.Context, limit, offset int) ([]*mo
 	defer m.mu.RUnlock()
 	out := make([]*model.User, 0, len(m.users))
 	for _, u := range m.users {
-		cp := *u
-		out = append(out, &cp)
+		out = append(out, u)
 	}
-	if offset > len(out) {
-		return []*model.User{}, nil
-	}
-	end := offset + limit
-	if limit <= 0 || end > len(out) {
-		end = len(out)
-	}
-	return out[offset:end], nil
+
+	return out, nil
 }
 
 func (m *MockUserStore) UpdateUser(ctx context.Context, u *model.User) error {
@@ -158,8 +157,7 @@ func (m *MockUserStore) UpdateUser(ctx context.Context, u *model.User) error {
 	if _, ok := m.users[u.ID]; !ok {
 		return errors.New("not found")
 	}
-	cp := *u
-	m.users[u.ID] = &cp
+	m.users[u.ID] = u
 	return nil
 }
 
@@ -309,26 +307,6 @@ func main() {
 	_ = store.CreateUser(ctx, &model.User{Email: "alice@example.com", Name: "Alice"})
 	u, _ := store.GetUserByEmail(ctx, "alice@example.com")
 	fmt.Println("Created:", u.ID, u.Email, u.Name)
+    ...
 }
 ```
-
----
-
-## 6) Exercices proposés
-
-1. Compléter ou réécrire les méthodes `db/local/local.go` en suivant [la documentation GORM](https://gorm.io/docs/).
-2. Ajouter un champ `Role` à `User`, faire une migration et tester les CRUD.
-3. Gérer les erreurs de doublon d’email avec `ErrRecordNotFound` et contraintes uniques.
-4. Ajouter une fonction qui crée un user et met à jour son nom dans une **transaction**.
-5. Implémenter un filtre `name LIKE` et la pagination dans `ListUsers`.
-6. (Optionnel) Ajouter un `BeforeCreate` hook pour générer un `UUID` si non fourni.
-
----
-
-## 7) Références utiles
-
-- [Documentation GORM](https://gorm.io/docs/)
-- [Driver SQLite](https://gorm.io/docs/connecting_to_the_database.html#SQLite)
-- [Transactions GORM](https://gorm.io/docs/transactions.html)
-- [Hooks](https://gorm.io/docs/hooks.html)
-- [Scopes & requêtes avancées](https://gorm.io/docs/scopes.html)
