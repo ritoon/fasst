@@ -77,6 +77,12 @@ Exemples :
 
 **Objectif :** journaliser les requêtes et éviter les crashs.
 
+Lancez :
+
+```sh
+go get github.com/labstack/echo/v4/middleware
+```
+
 ```go
 import "github.com/labstack/echo/v4/middleware"
 
@@ -122,7 +128,7 @@ e.POST("/users", func(c echo.Context) error {
 Tester avec :
 
 ```bash
-curl -X POST :1323/users \
+curl -X POST localhost:1323/users \
   -H 'Content-Type: application/json' \
   -d '{"name":"Joe","email":"joe@ex"}'
 ```
@@ -223,7 +229,7 @@ e.POST("/upload", func(c echo.Context) error {
 4. Test rapide :
 
 ```bash
-curl -F 'file=@README.md' :1323/upload
+curl -F 'file=@README.md' localhost:1323/upload
 ```
 
 > Import à ajouter : `io`, `os`, `path/filepath`, et `github.com/labstack/echo/v4/middleware`.
@@ -240,6 +246,15 @@ curl -F 'file=@README.md' :1323/upload
 go get github.com/golang-jwt/jwt/v5
 ```
 
+Dans import avoir les packages suivants:
+
+```
+"github.com/golang-jwt/jwt/v5"
+"echojwt "github.com/labstack/echo-jwt/v4"
+"github.com/labstack/echo/v4"
+"github.com/labstack/echo/v4/middleware"
+```
+
 2. Claims personnalisés :
 
 ```go
@@ -252,38 +267,85 @@ type JwtCustomClaims struct {
 
 3. Endpoint de login (token HS256) :
 
+Dans la fonction main ajouter:
+
 ```go
-var jwtSecret = []byte("secret") // à stocker en variable d'env en prod
+config := echojwt.Config{
+		NewClaimsFunc: func(c echo.Context) jwt.Claims {
+			return new(jwtCustomClaims)
+		},
+		SigningKey: []byte("secret"),
+	}
+	r.Use(echojwt.WithConfig(config))
+```
 
-e.POST("/login", func(c echo.Context) error {
-  var u struct {
-    Email string `json:"email"`
-    Name  string `json:"name"`
-  }
-  if err := c.Bind(&u); err != nil {
-    return echo.NewHTTPError(400, "payload invalide")
-  }
+Ajouter les routes suivantes:
 
-  // Démo : "auth" triviale
-  if u.Email == "" || u.Name == "" {
-    return echo.NewHTTPError(401, "identifiants invalides")
-  }
+```go
+e.POST("/login", login)
+e.GET("/", accessible)
+r := e.Group("/restricted")
+r.GET("/admin", restricted)
+```
 
-  claims := &JwtCustomClaims{
-    Name:  u.Name,
-    Admin: true,
-    RegisteredClaims: jwt.RegisteredClaims{
-      ExpiresAt: jwt.NewNumericDate(time.Now().Add(1 * time.Hour)),
-      Issuer:    "tp-echo",
-    },
-  }
+Ajouter les functions suivantes:
 
-  token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-  signed, err := token.SignedString(jwtSecret)
-  if err != nil { return err }
+```go
+func login(c echo.Context) error {
 
-  return c.JSON(200, map[string]string{"token": signed})
-})
+	var payload LoginPayload
+	c.Bind(&payload)
+
+	fmt.Println("login called", payload)
+
+	// Throws unauthorized error
+	if payload.Email != "joe@ex" || payload.Password != "Joe" {
+		return echo.ErrUnauthorized
+	}
+
+	// Set custom claims
+	claims := &jwtCustomClaims{
+		"Jon Snow",
+		true,
+		jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour * 72)),
+		},
+	}
+
+	// Create token with claims
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+
+	// Generate encoded token and send it as response.
+	t, err := token.SignedString([]byte("secret"))
+	if err != nil {
+		return err
+	}
+
+	return c.JSON(http.StatusOK, echo.Map{
+		"token": t,
+	})
+}
+
+func accessible(c echo.Context) error {
+	return c.String(http.StatusOK, "Accessible")
+}
+
+func restricted(c echo.Context) error {
+	user := c.Get("user").(*jwt.Token)
+	claims := user.Claims.(*jwtCustomClaims)
+	name := claims.Name
+	return c.String(http.StatusOK, "Welcome "+name+"!")
+}
+
+```
+
+Créer une structure de données pour le login
+
+```go
+type LoginPayload struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
 ```
 
 4. Groupe protégé par JWT :
@@ -310,12 +372,12 @@ api.GET("/users", func(c echo.Context) error {
 
 ```bash
 # 1) Obtenir un token
-TOKEN=$(curl -s -X POST :1323/login \
+TOKEN=$(curl -s -X POST localhost:1323/login \
   -H 'Content-Type: application/json' \
-  -d '{"email":"joe@ex","name":"Joe"}' | jq -r .token)
+  -d '{"email":"joe@ex","password":"Joe"}' | jq -r .token)
 
 # 2) Appeler la route protégée
-curl -H "Authorization: Bearer $TOKEN" :1323/api/users
+curl -H "Authorization: Bearer $TOKEN" localhost:1323/api/users
 ```
 
 🎯 **Fin du TP**
