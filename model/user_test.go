@@ -8,6 +8,6 @@ import (
 
 func TestUserSayHello(t *testing.T) {
 	u := model.NewUser("toto", "titi")
-	u.SayHello()
+	u.ValidateForCreate()
 
 }
