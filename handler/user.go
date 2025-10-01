@@ -107,14 +107,20 @@ func (h *Handler) Login(c echo.Context) error {
 
 	fmt.Println("login called", payload)
 
+	ctx := context.Background()
+	u, err := h.dbUsers.GetUserByEmail(ctx, payload.Email)
+	if err != nil {
+		return echo.ErrUnauthorized
+	}
+
 	// Throws unauthorized error
-	if payload.Email != "joe@ex" || payload.Password != "Joe" {
+	if payload.Password != u.Password {
 		return echo.ErrUnauthorized
 	}
 
 	// Set custom claims
 	claims := &JwtCustomClaims{
-		"Jon Snow",
+		u.FristName + " " + u.LastName,
 		true,
 		jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour * 72)),
