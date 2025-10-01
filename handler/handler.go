@@ -23,7 +23,7 @@ func New(r *echo.Echo, db db.UserStore) *Handler {
 func (h *Handler) initRoutes() {
 	h.router.POST("/users", h.CreateUser)
 	h.router.GET("/users/:id", h.GetUserByID)
-	h.router.PUT("/users/:id", h.UpdateUserByID)
+	h.router.PATCH("/users/:id", h.UpdateUserByID)
 	h.router.DELETE("/users/:id", h.DeleteUserByID)
 	h.router.POST("/login", h.Login)
 }

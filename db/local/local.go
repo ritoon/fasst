@@ -73,7 +73,7 @@ func (s *LocalUserStore) ListUsers(ctx context.Context, limit, offset int) ([]*m
 }
 
 func (s *LocalUserStore) UpdateUser(ctx context.Context, uuid string, u *model.User) error {
-	return s.db.WithContext(ctx).Save(u).Error
+	return s.db.WithContext(ctx).Where("uuid = ?", uuid).Updates(u).Error
 }
 
 func (s *LocalUserStore) DeleteUser(ctx context.Context, UUID string) error {

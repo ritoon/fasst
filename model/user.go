@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 type User struct {
@@ -88,6 +89,11 @@ func (u *User) UpdateFromMap(data map[string]interface{}) error {
 	}
 
 	return nil
+}
+
+func (u *User) BeforeCreate(tx *gorm.DB) (err error) {
+	u.UUID = uuid.NewString()
+	return
 }
 
 type UserForPatch struct {
